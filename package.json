@@ -1,0 +1,14 @@
+{
+  "name": "api-gateway",
+  "version": "1.0.0",
+  "description": "API Gateway para projeto integrado",
+  "main": "api-gateway.js",
+  "scripts": {
+    "start": "node api-gateway.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "express-http-proxy": "^2.0.0",
+    "morgan": "^1.10.0"
+  }
+}
