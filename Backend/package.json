@@ -1,0 +1,25 @@
+{
+  "name": "api-gateway",
+  "version": "1.0.0",
+  "description": "API Gateway para projeto integrado",
+  "main": "api-gateway.js",
+  "scripts": {
+    "start": "node api-gateway.js"
+  },
+  "dependencies": {
+    "express": "^4.21.2",
+    "express-http-proxy": "^2.1.2",
+    "morgan": "^1.10.1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ArthurPRodrigues/Integrated-project-mobile-embedded.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/ArthurPRodrigues/Integrated-project-mobile-embedded/issues"
+  },
+  "homepage": "https://github.com/ArthurPRodrigues/Integrated-project-mobile-embedded#readme"
+}

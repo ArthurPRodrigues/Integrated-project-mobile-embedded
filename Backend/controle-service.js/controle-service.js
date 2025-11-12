@@ -18,12 +18,9 @@ app.get("/config", (req, res) => {
 });
 
 app.post("/setup", (req, res) => {
-  const { timespan, actuator_pin, run_again } = req.body;
+  const { timespan, loop_counter, run_again } = req.body;
 
-  if (timespan !== undefined) config.timespan = timespan;
-  if (actuator_pin !== undefined) config.actuator_pin = actuator_pin;
-  if (run_again !== undefined) config.run_again = run_again;
-
+    
   console.log("Configuração atualizada:", config);
   res.json({ success: true, config });
 });
