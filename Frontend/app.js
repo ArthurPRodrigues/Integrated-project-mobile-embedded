@@ -17,15 +17,17 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createDrawerNavigator } from '@react-navigation/drawer';
 import { Feather } from '@expo/vector-icons';
 
+const SERVER_URL = 'http://192.168.0.15:8000'; // <--- Precisa alterar o IP
+
+import LogsScreen from './LogsScreen';
+
 const Stack = createNativeStackNavigator();
 const Drawer = createDrawerNavigator();
 
-const SERVER_URL = 'http://10.0.2.2:3000'; // <--- Mudar isso aqui conforme formos colocar o servidor de pé
-
-/* Home Screen */
+// HOME SCREEN (Controle do ESP)
 function HomeScreen({ navigation }) {
   const [loading, setLoading] = React.useState(false);
-  const [timespan, setTimespan] = React.useState(10); // número de ciclos (padrão baseado em controle-service.js)
+  const [timespan, setTimespan] = React.useState(10);
   const [runAgain, setRunAgain] = React.useState(false);
   const [lastResponse, setLastResponse] = React.useState(null);
 
@@ -36,24 +38,19 @@ function HomeScreen({ navigation }) {
   async function fetchConfig() {
     try {
       setLoading(true);
-      const res = await fetch(`${SERVER_URL}/config`);
+      const res = await fetch(`${SERVER_URL}/config/setup`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
-      // Espera-se que config tenha timespan, actuator_pin, run_again...
+
       if (data && typeof data.timespan !== 'undefined') {
         setTimespan(Number(data.timespan));
-      } else {
-        // fallback: se o endpoint devolver o objeto 'config' em envoltório
-        if (data.config && typeof data.config.timespan !== 'undefined') {
-          setTimespan(Number(data.config.timespan));
-        }
       }
       if (data && typeof data.run_again !== 'undefined') {
         setRunAgain(Boolean(data.run_again));
       }
+
       setLastResponse(null);
     } catch (err) {
-      console.warn('Erro ao buscar config:', err);
       Alert.alert('Erro', `Não foi possível buscar configuração: ${err.message}`);
     } finally {
       setLoading(false);
@@ -68,17 +65,19 @@ function HomeScreen({ navigation }) {
         loop_counter: 0,
         run_again: runAgain ? 1 : 0,
       };
-      const res = await fetch(`${SERVER_URL}/setup`, {
+
+      const res = await fetch(`${SERVER_URL}/config/setup`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
+
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
       const json = await res.json();
       setLastResponse(json);
       Alert.alert('Sucesso', 'Configuração enviada com sucesso.');
     } catch (err) {
-      console.warn('Erro ao enviar setup:', err);
       Alert.alert('Erro', `Não foi possível enviar configuração: ${err.message}`);
     } finally {
       setLoading(false);
@@ -96,6 +95,7 @@ function HomeScreen({ navigation }) {
     <SafeAreaView style={styles.container}>
       <View style={styles.headerRow}>
         <Text style={styles.title}>Controle do ESP3200</Text>
+
         <TouchableOpacity onPress={fetchConfig} style={styles.iconButton}>
           <Feather name="refresh-cw" size={20} />
         </TouchableOpacity>
@@ -103,6 +103,7 @@ function HomeScreen({ navigation }) {
 
       <View style={styles.card}>
         <Text style={styles.label}>Ciclos (timespan)</Text>
+
         <View style={styles.row}>
           <Pressable style={styles.stepBtn} onPress={dec}>
             <Text style={styles.stepTxt}>–</Text>
@@ -111,7 +112,6 @@ function HomeScreen({ navigation }) {
           <TextInput
             value={String(timespan)}
             onChangeText={(t) => {
-              // aceita apenas números
               const cleaned = t.replace(/[^0-9]/g, '');
               setTimespan(cleaned === '' ? 0 : Number(cleaned));
             }}
@@ -135,70 +135,29 @@ function HomeScreen({ navigation }) {
           </Pressable>
         </View>
 
-        {loading && (
-          <View style={{ marginTop: 12 }}>
-            <ActivityIndicator size="small" />
-          </View>
-        )}
+        {loading && <ActivityIndicator style={{ marginTop: 12 }} size="small" />}
 
         {lastResponse && (
           <View style={{ marginTop: 12 }}>
-            <Text style={{ fontSize: 12, color: '#333' }}>Resposta: {JSON.stringify(lastResponse)}</Text>
+            <Text style={{ fontSize: 12 }}>
+              Resposta: {JSON.stringify(lastResponse)}
+            </Text>
           </View>
         )}
       </View>
 
       <View style={styles.card}>
-        <Text style={styles.label}>Notas</Text>
+        <Text style={styles.label}>Importante</Text>
         <Text style={{ fontSize: 13, color: '#444' }}>
-          - Ajuste o SERVER_URL no topo do App.js se o backend não estiver no mesmo dispositivo.{'\n'}
-          - Emulador Android local: use http://10.0.2.2:3000.{' '}
+          - O app, o ESP e o Backend devem estar na MESMA rede Wi-Fi{'\n'}
+          - Sempre use o IP real do computador no SERVER_URL
         </Text>
       </View>
     </SafeAreaView>
   );
 }
 
-/* sub telas */
-function ProgramacaoJogosScreen() {
-  return (
-    <SafeAreaView style={styles.center}>
-      <Text style={styles.title}>Programação dos Jogos</Text>
-      <Text>Esta tela é um stub — adicione sua lógica aqui.</Text>
-    </SafeAreaView>
-  );
-}
-function ModalidadeDetailsScreen() {
-  return (
-    <SafeAreaView style={styles.center}>
-      <Text style={styles.title}>Detalhes da Modalidade</Text>
-    </SafeAreaView>
-  );
-}
-function FavoritosScreen() {
-  return (
-    <SafeAreaView style={styles.center}>
-      <Text style={styles.title}>Meus Favoritos</Text>
-    </SafeAreaView>
-  );
-}
-function AlojamentoListScreen({ navigation }) {
-  return (
-    <SafeAreaView style={styles.center}>
-      <Text style={styles.title}>Alojamentos</Text>
-      <Text>Lista de alojamentos (stub).</Text>
-    </SafeAreaView>
-  );
-}
-function AlojamentoDetailsScreen() {
-  return (
-    <SafeAreaView style={styles.center}>
-      <Text style={styles.title}>Detalhes do Alojamento</Text>
-    </SafeAreaView>
-  );
-}
-
-/* Navegação */
+// NAVEGAÇÃO
 function AppStack() {
   return (
     <Stack.Navigator
@@ -209,7 +168,6 @@ function AppStack() {
           <TouchableOpacity
             onPress={() => navigation.getParent()?.toggleDrawer()}
             style={{ paddingHorizontal: 12 }}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
             <Feather name="menu" size={22} />
           </TouchableOpacity>
@@ -217,11 +175,8 @@ function AppStack() {
       })}
     >
       <Stack.Screen name="Home" component={HomeScreen} options={{ title: 'Home' }} />
-      <Stack.Screen name="ProgramacaoJogos" component={ProgramacaoJogosScreen} options={{ title: 'Programação dos Jogos' }} />
-      <Stack.Screen name="ModalidadeDetails" component={ModalidadeDetailsScreen} options={{ title: 'Detalhes da Modalidade' }} />
-      <Stack.Screen name="AlojamentoList" component={AlojamentoListScreen} options={{ title: 'Alojamentos' }} />
-      <Stack.Screen name="AlojamentoDetails" component={AlojamentoDetailsScreen} options={{ title: 'Detalhes do Alojamento' }} />
-      <Stack.Screen name="Favoritos" component={FavoritosScreen} options={{ title: 'Meus Favoritos' }} />
+      <Stack.Screen name="Logs" component={LogsScreen} options={{ title: 'Histórico de Leituras' }} />
+
     </Stack.Navigator>
   );
 }
@@ -237,14 +192,13 @@ function DrawerContent({ navigation }) {
       <Pressable onPress={() => go('Home')} style={{ padding: 16 }}>
         <Text style={{ fontSize: 16 }}>🏠 Home</Text>
       </Pressable>
+
+      <Pressable onPress={() => go('Logs')} style={{ padding: 16 }}>
+        <Text style={{ fontSize: 16 }}>📜 Histórico</Text>
+      </Pressable>
+
       <Pressable onPress={() => go('Favoritos')} style={{ padding: 16 }}>
         <Text style={{ fontSize: 16 }}>⭐ Meus Favoritos</Text>
-      </Pressable>
-      <Pressable onPress={() => go('ProgramacaoJogos')} style={{ padding: 16 }}>
-        <Text style={{ fontSize: 16 }}>⛹️ Programação dos Jogos</Text>
-      </Pressable>
-      <Pressable onPress={() => go('AlojamentoList')} style={{ padding: 16 }}>
-        <Text style={{ fontSize: 16 }}>🏛️ Alojamentos</Text>
       </Pressable>
     </View>
   );
@@ -253,7 +207,7 @@ function DrawerContent({ navigation }) {
 function Root() {
   return (
     <Drawer.Navigator screenOptions={{ headerShown: false }} drawerContent={(p) => <DrawerContent {...p} />}>
-      <Drawer.Screen name="App" component={AppStack} options={{ title: 'Início' }} />
+      <Drawer.Screen name="App" component={AppStack} />
     </Drawer.Navigator>
   );
 }
@@ -266,9 +220,7 @@ export default function App() {
   );
 }
 
-/* ---------------------------
-   Estilos
-   --------------------------- */
+// ESTILOS
 const styles = StyleSheet.create({
   container: {
     flex: 1,
