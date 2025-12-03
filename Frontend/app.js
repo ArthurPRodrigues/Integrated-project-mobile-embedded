@@ -196,10 +196,6 @@ function DrawerContent({ navigation }) {
       <Pressable onPress={() => go('Logs')} style={{ padding: 16 }}>
         <Text style={{ fontSize: 16 }}>📜 Histórico</Text>
       </Pressable>
-
-      <Pressable onPress={() => go('Favoritos')} style={{ padding: 16 }}>
-        <Text style={{ fontSize: 16 }}>⭐ Meus Favoritos</Text>
-      </Pressable>
     </View>
   );
 }
