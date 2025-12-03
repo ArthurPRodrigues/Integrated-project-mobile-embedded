@@ -1,0 +1,251 @@
+#include <Wire.h>
+#include <Adafruit_GFX.h>
+#include <Adafruit_SSD1306.h>
+#include <WiFi.h>
+#include <HTTPClient.h>
+#include <ArduinoJson.h> 
+
+const char* ssid = "wifi";
+const char* password = "password";
+
+const char* config_url = "http://192.168.0.15:8000/config/setup";
+const char* logs_url = "http://192.168.0.15:8000/config/logs";
+
+#define SCREEN_WIDTH 128
+#define SCREEN_HEIGHT 64
+#define OLED_RESET -1
+#define SCREEN_ADDRESS 0x3C
+Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
+
+const int LDR_PIN = 19;
+const int ACTUATOR_PIN = 2;
+
+int global_actuator_pin = ACTUATOR_PIN;
+int timespan = 0;
+int loop_counter = 0;
+int run_again = 0;
+int reset_counter = 0; // Novo: flag para resetar contador
+
+unsigned long lastConfigCheck = 0;
+const unsigned long CONFIG_CHECK_INTERVAL = 10000; // Busca config a cada 10 segundos
+
+// ------------------------------------------------
+// Função para buscar a configuração via GET
+// ------------------------------------------------
+void get_config() {
+    if (WiFi.status() == WL_CONNECTED) {
+        HTTPClient http;
+        http.begin(config_url);
+        http.setTimeout(5000); // Timeout de 5 segundos
+
+        Serial.println("Buscando configuração...");
+        int httpCode = http.GET();
+
+        if (httpCode == HTTP_CODE_OK) {
+            String payload = http.getString();
+            StaticJsonDocument<256> doc;
+            DeserializationError error = deserializeJson(doc, payload);
+
+            if (!error) {
+                if (doc.containsKey("timespan")) {
+                    timespan = doc["timespan"].as<int>();
+                    Serial.print("Timespan: ");
+                    Serial.println(timespan);
+                }
+                if (doc.containsKey("run_again")) {
+                    run_again = doc["run_again"].as<int>();
+                    Serial.print("Run Again: ");
+                    Serial.println(run_again);
+                }
+                if (doc.containsKey("reset_counter")) {
+                    reset_counter = doc["reset_counter"].as<int>();
+                    if (reset_counter == 1) {
+                        loop_counter = 0; // Reseta o contador
+                        Serial.println("Contador resetado!");
+                    }
+                }
+                if (doc.containsKey("actuator_pin")) {
+                    int new_pin = doc["actuator_pin"].as<int>();
+                    if (new_pin != global_actuator_pin) {
+                        global_actuator_pin = new_pin;
+                        pinMode(global_actuator_pin, OUTPUT);
+                        Serial.print("Novo Pino: ");
+                        Serial.println(global_actuator_pin);
+                    }
+                }
+            } else {
+                Serial.print("Erro JSON: ");
+                Serial.println(error.c_str());
+            }
+        } else {
+            Serial.print("Erro GET: ");
+            Serial.println(httpCode);
+        }
+        http.end();
+    }
+}
+
+// ------------------------------------------------
+// Função para enviar logs via POST
+// ------------------------------------------------
+void send_log(int ldr_value, String brightness_status) {
+    if (WiFi.status() == WL_CONNECTED) {
+        HTTPClient http;
+        http.begin(logs_url);
+        http.addHeader("Content-Type", "application/json");
+        http.setTimeout(5000);
+
+        // Cria JSON com os dados
+        StaticJsonDocument<256> doc;
+        doc["loop_counter"] = loop_counter;
+        doc["timespan"] = timespan;
+        doc["ldr_value"] = ldr_value;
+        doc["actuator_pin"] = global_actuator_pin;
+        doc["brightness_status"] = brightness_status;
+        doc["ip_address"] = WiFi.localIP().toString();
+
+        String jsonString;
+        serializeJson(doc, jsonString);
+
+        int httpCode = http.POST(jsonString);
+
+        if (httpCode == HTTP_CODE_OK) {
+            Serial.println("Log enviado com sucesso");
+        } else {
+            Serial.print("Erro ao enviar log: ");
+            Serial.println(httpCode);
+        }
+        http.end();
+    }
+}
+
+// ------------------------------------------------
+// Setup
+// ------------------------------------------------
+void setup() {
+    Serial.begin(115200);
+    pinMode(LDR_PIN, INPUT);
+    pinMode(ACTUATOR_PIN, OUTPUT);
+
+    if (!display.begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS)) {
+        Serial.println("Erro ao inicializar OLED");
+        for (;;);
+    }
+    
+    display.clearDisplay();
+    display.setTextSize(1);
+    display.setTextColor(SSD1306_WHITE);
+    display.setCursor(0, 0);
+    display.print("Conectando WiFi...");
+    display.display();
+
+    WiFi.begin(ssid, password);
+    while (WiFi.status() != WL_CONNECTED) {
+        delay(500);
+        Serial.print(".");
+    }
+    Serial.println("\nConectado ao WiFi!");
+    Serial.print("IP: ");
+    Serial.println(WiFi.localIP());
+
+    // Busca configuração inicial
+    get_config();
+}
+
+// ------------------------------------------------
+// Loop principal
+// ------------------------------------------------
+void loop() {
+    // Busca configuração periodicamente (a cada 10 segundos)
+    unsigned long currentMillis = millis();
+    if (currentMillis - lastConfigCheck >= CONFIG_CHECK_INTERVAL) {
+        get_config();
+        lastConfigCheck = currentMillis;
+    }
+
+    // Verifica se atingiu o limite
+    if (timespan > 0 && loop_counter >= timespan) {
+        digitalWrite(global_actuator_pin, LOW);
+        
+        display.clearDisplay();
+        display.setCursor(0, 0);
+        display.setTextSize(2);
+        display.println("LIMITE");
+        display.println("ATINGIDO!");
+        display.setTextSize(1);
+        display.println("");
+        display.println("Aguardando reset...");
+        display.display();
+
+        Serial.println("====================================");
+        Serial.println("LIMITE ATINGIDO - Aguardando reset");
+        Serial.println("====================================");
+
+        // Aguarda run_again = 1
+        while(true) {
+            get_config();
+            if (run_again == 1) {
+                loop_counter = 0;
+                run_again = 0; // Reseta para não rodar novamente
+                Serial.println("Sistema reiniciado!");
+                break;
+            }
+            delay(5000); // Verifica a cada 5 segundos
+        }
+    } else {
+        // Lê LDR
+        int ldrValue = digitalRead(LDR_PIN);
+        String brightness_status;
+
+        // Controla atuador
+        if (ldrValue == 1) {
+            digitalWrite(global_actuator_pin, HIGH);
+            brightness_status = "ON (Escuro)";
+        } else {
+            digitalWrite(global_actuator_pin, LOW);
+            brightness_status = "OFF (Claro)";
+        }
+
+        // Atualiza display
+        display.clearDisplay();
+        display.setTextSize(1);
+        display.setCursor(0, 0);
+        
+        display.print("(");
+        display.print(loop_counter + 1);
+        display.print("/");
+        display.print(timespan);
+        display.print(") LDR: ");
+        display.println(ldrValue);
+        
+        display.print("Pin: ");
+        display.println(global_actuator_pin);
+
+        display.setCursor(0, 30);
+        display.print("Status: ");
+        display.println(brightness_status);
+
+        display.setCursor(0, 50);
+        display.print("IP: ");
+        display.print(WiFi.localIP());
+        display.display();
+
+        // Log serial
+        Serial.print("(");
+        Serial.print(loop_counter + 1);
+        Serial.print("/");
+        Serial.print(timespan);
+        Serial.print(") LDR: ");
+        Serial.print(ldrValue);
+        Serial.print(" | Pin: ");
+        Serial.print(global_actuator_pin);
+        Serial.print(" | ");
+        Serial.println(brightness_status);
+
+        // Envia log para o backend
+        send_log(ldrValue, brightness_status);
+        
+        loop_counter++;
+        delay(120000); 
+    }
+}

@@ -4,7 +4,11 @@
   "description": "API Gateway para projeto integrado",
   "main": "api-gateway.js",
   "scripts": {
-    "start": "node api-gateway.js"
+    "start": "node api-gateway.js",
+    "dev": "concurrently \"npm run controle\" \"npm run logging\" \"npm run gateway\"",
+    "controle": "cd controle-service.js && npm start",
+    "logging": "cd logging-service.js && npm start",
+    "gateway": "node api-gateway.js/api-gateway.js"
   },
   "dependencies": {
     "express": "^4.21.2",
@@ -21,5 +25,8 @@
   "bugs": {
     "url": "https://github.com/ArthurPRodrigues/Integrated-project-mobile-embedded/issues"
   },
-  "homepage": "https://github.com/ArthurPRodrigues/Integrated-project-mobile-embedded#readme"
+  "homepage": "https://github.com/ArthurPRodrigues/Integrated-project-mobile-embedded#readme",
+  "devDependencies": {
+    "concurrently": "^9.2.1"
+  }
 }
