@@ -7,22 +7,25 @@ app.use(logger("dev"));
 
 function selectProxyHost(req) {
   if (req.path.startsWith("/config")) return "http://localhost:3000/";
-  
+
   if (req.path.startsWith("/logs")) return "http://localhost:3001/";
-  
+
   return null;
 }
 
 app.use((req, res, next) => {
   var proxyHost = selectProxyHost(req);
-  
+
   if (proxyHost == null) {
     res.status(404).send("Not found");
   } else {
     httpProxy(proxyHost, {
-      proxyReqPathResolver: function(req) {
-        return req.url.replace(/^\/(config|logs)/, '');
-      }
+      proxyReqPathResolver: function (req) {
+        if (req.url.startsWith("/config")) {
+          return req.url.replace(/^\/config/, "");
+        }
+        return req.url;
+      },
     })(req, res, next);
   }
 });
