@@ -78,7 +78,7 @@ app.post("/setup", (req, res) => {
   // Atualiza apenas os campos que foram enviados
   if (timespan !== undefined) {
     config.timespan = timespan;
-    config.reset_counter = 1; // Sinaliza reset
+    config.reset_counter = 1; 
   }
   if (actuator_pin !== undefined) config.actuator_pin = actuator_pin;
   if (run_again !== undefined) config.run_again = run_again;
@@ -118,12 +118,13 @@ app.get("/setup", (req, res) => {
 
       console.log("Setup solicitado pelo Arduino");
 
-      // Após Arduino ler, reseta os flags
-      if (config.reset_counter === 1 || config.run_again === 1) {
+      // Reseta APENAS reset_counter após Arduino ler
+      if (config.reset_counter === 1) {
         db.run(
-          "UPDATE config SET reset_counter = 0, run_again = 0 WHERE id = 1",
+          "UPDATE config SET reset_counter = 0 WHERE id = 1",
           (err) => {
             if (!err) {
+              console.log("reset_counter resetado");
             }
           }
         );
